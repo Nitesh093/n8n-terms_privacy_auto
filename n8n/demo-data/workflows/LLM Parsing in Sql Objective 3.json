@@ -1,0 +1,958 @@
+{
+  "name": "LLM Parsing in Sql Objective 3",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1536,
+        1008
+      ],
+      "id": "fe9c8611-6f20-4c08-9c81-fb24cfb29e14",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "fileSelector": "=.n8n-files/Template 1.xlsx",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        -1312,
+        928
+      ],
+      "id": "fe39056f-8d86-4c3b-8886-64710defdecc",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -1104,
+        928
+      ],
+      "id": "28fc9686-ad52-4ad0-bfdf-21f21f8b37a5",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "fileSelector": ".n8n-files/List 1.csv",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        -1296,
+        1120
+      ],
+      "id": "82bba572-153d-413f-84ed-a7d1de41ffab",
+      "name": "Read/Write Files from Disk1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -1088,
+        1120
+      ],
+      "id": "708f9dbf-d73f-4a86-86f9-208c4c243a2d",
+      "name": "Extract from File1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Template 1.xlsx structure:\n// Expect a column named \"SCOPES\"\n\nconst rows = items.map(i => i.json);\n\nconst scopes = rows\n  .map(r => r.SCOPES)\n  .filter(Boolean)\n  .map(s =>\n    s\n      .toLowerCase()\n      .replace(/[^a-z0-9]+/g, \"_\")\n      .replace(/^_|_$/g, \"\")\n  );\n\nreturn [\n  {\n    json: {\n      scopes\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -912,
+        928
+      ],
+      "id": "81c4b977-be3e-49b1-b322-f01399ec7b0d",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => ({\n  json: {\n    id: item.json.id,\n    name: item.json.name,\n    domain: item.json.domain,\n    generic_email: item.json.generic_email || null,\n    contact_email: item.json.contact_email || null,\n    privacy_email: item.json.privacy_email || null,\n    delete_link: item.json.delete_link || null,\n    country: item.json.country || null\n  }\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -880,
+        1120
+      ],
+      "id": "8fc6ada1-3ccf-4369-83b2-603386f712dc",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const scopes = $json.scopes;\n\nconst columns = scopes.map(\n  s => `${s} BOOLEAN DEFAULT false`\n);\n\nreturn [{\n  json: {\n    create_table_sql: `\n      CREATE TABLE IF NOT EXISTS policy_scope_matrix (\n        id TEXT PRIMARY KEY,\n        domain TEXT UNIQUE,\n        ${columns.join(\",\\n\")},\n        source_confidence JSONB,\n        updated_at TIMESTAMP\n      );\n    `\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        928
+      ],
+      "id": "a60ec865-607b-4bb9-a3f9-bc22423fdac6",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.create_table_sql }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -528,
+        928
+      ],
+      "id": "8881d382-ccab-4f54-921a-113d1019aa4c",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "yI2DPywfRK0VtKZk",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -704,
+        1168
+      ],
+      "id": "4522ca8b-2879-48b4-bee1-213158fc8f90",
+      "name": "Loop Over Items1"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    query: `\n      INSERT INTO policy_scope_matrix (id, domain)\n      VALUES ($1, $2)\n      ON CONFLICT (id) DO NOTHING;\n    `,\n    values: [$json.id, $json.domain]\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -352,
+        1152
+      ],
+      "id": "454f9b57-8abd-4682-b29c-4059bae4160d",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "mode": "load",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "policy_documents",
+          "mode": "list",
+          "cachedResultName": "policy_documents"
+        },
+        "prompt": "={\n  \"must\": [\n    {\n      \"key\": \"domain\",\n      \"match\": {\n        \"value\": \"{{ $json.domain }}\"\n      }\n    }\n  ]\n}\n",
+        "topK": 3,
+        "options": {
+          "contentPayloadKey": "content",
+          "metadataPayloadKey": "metadata"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1.3,
+      "position": [
+        -432,
+        1296
+      ],
+      "id": "c7b123ba-3abf-4b33-a191-d2e47e498e6e",
+      "name": "Qdrant Vector Store",
+      "credentials": {
+        "qdrantApi": {
+          "id": "sFfERYppMeBnFNeA",
+          "name": "Local QdrantApi database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "nomic-embed-text:latest"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOllama",
+      "typeVersion": 1,
+      "position": [
+        -432,
+        1488
+      ],
+      "id": "48fccbde-43c4-4614-b029-245767d19cf1",
+      "name": "Embeddings Ollama",
+      "credentials": {
+        "ollamaApi": {
+          "id": "xHuYe0MDGOs9IpBW",
+          "name": "Local Ollama service"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const combinedText = items\n  .map(item => item.json.document.pageContent)\n  .filter(Boolean)\n  .join(\"\\n\\n---\\n\\n\");\n\nconst firstItem = items[0].json.document.metadata;\n\nreturn [\n  {\n    json: {\n      domain: firstItem.domain,\n      doc_type: firstItem.doc_type,\n      text: combinedText,\n    },\n  },\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        1296
+      ],
+      "id": "d6e4ea87-2484-4d71-8efd-592d0811a91b",
+      "name": "Code in JavaScript4"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "policy_scope_matrix",
+          "mode": "list",
+          "cachedResultName": "policy_scope_matrix"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "registration_user_control_and_account_management": false,
+            "service_provision": false,
+            "customization_and_personalization": false,
+            "business_operations": false,
+            "legal_and_security_purposes": false,
+            "customer_service_customer_feedback_and_support": false,
+            "advertising_and_marketing_not_requiring_user_consent": false,
+            "statistical_and_anonymized_uses_public_and_research_benefits": false,
+            "diagnostics_service_maintenance_and_quality_improvement_crash_r": false,
+            "analytics_research_and_measurement": false,
+            "international_data_transfers_within_the_same_company_group": false,
+            "development_of_ai_and_biometric_features": false,
+            "developing_new_services": false,
+            "security_and_fraud_prevention": false,
+            "user_communication": false,
+            "profiling_and_automated_decision_making": false,
+            "emergency_and_public_interest_uses": false,
+            "third_party_data_sharing_and_services": false,
+            "mergers_and_acquisitions": false,
+            "data_enrichment": false,
+            "use_of_cookies_and_tracking_technologies": false,
+            "publicity_and_social_media_social_media_integrations": false,
+            "rights_management": false,
+            "data_collection_from_devices": false,
+            "participation_in_promotions": false,
+            "sensitive_personal_data_processing": false,
+            "public_content_sharing": false,
+            "email_marketing": false,
+            "biometric_data_stored_locally": false,
+            "training_ai_algorithms_and_models": false,
+            "cross_context_behavioral_advertising": false,
+            "children_s_personal_information": false,
+            "id": "={{ $json.values[0] }}",
+            "domain": "={{ $json.values[1] }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": true,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "domain",
+              "displayName": "domain",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "registration_user_control_and_account_management",
+              "displayName": "registration_user_control_and_account_management",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "service_provision",
+              "displayName": "service_provision",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "customization_and_personalization",
+              "displayName": "customization_and_personalization",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "business_operations",
+              "displayName": "business_operations",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "legal_and_security_purposes",
+              "displayName": "legal_and_security_purposes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "customer_service_customer_feedback_and_support",
+              "displayName": "customer_service_customer_feedback_and_support",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "advertising_and_marketing_not_requiring_user_consent",
+              "displayName": "advertising_and_marketing_not_requiring_user_consent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "statistical_and_anonymized_uses_public_and_research_benefits",
+              "displayName": "statistical_and_anonymized_uses_public_and_research_benefits",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "diagnostics_service_maintenance_and_quality_improvement_crash_r",
+              "displayName": "diagnostics_service_maintenance_and_quality_improvement_crash_r",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "analytics_research_and_measurement",
+              "displayName": "analytics_research_and_measurement",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "international_data_transfers_within_the_same_company_group",
+              "displayName": "international_data_transfers_within_the_same_company_group",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "development_of_ai_and_biometric_features",
+              "displayName": "development_of_ai_and_biometric_features",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "developing_new_services",
+              "displayName": "developing_new_services",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "security_and_fraud_prevention",
+              "displayName": "security_and_fraud_prevention",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "user_communication",
+              "displayName": "user_communication",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "profiling_and_automated_decision_making",
+              "displayName": "profiling_and_automated_decision_making",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "emergency_and_public_interest_uses",
+              "displayName": "emergency_and_public_interest_uses",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "third_party_data_sharing_and_services",
+              "displayName": "third_party_data_sharing_and_services",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "mergers_and_acquisitions",
+              "displayName": "mergers_and_acquisitions",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "data_enrichment",
+              "displayName": "data_enrichment",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "use_of_cookies_and_tracking_technologies",
+              "displayName": "use_of_cookies_and_tracking_technologies",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "publicity_and_social_media_social_media_integrations",
+              "displayName": "publicity_and_social_media_social_media_integrations",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "rights_management",
+              "displayName": "rights_management",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "data_collection_from_devices",
+              "displayName": "data_collection_from_devices",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "participation_in_promotions",
+              "displayName": "participation_in_promotions",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "sensitive_personal_data_processing",
+              "displayName": "sensitive_personal_data_processing",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "public_content_sharing",
+              "displayName": "public_content_sharing",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "email_marketing",
+              "displayName": "email_marketing",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "biometric_data_stored_locally",
+              "displayName": "biometric_data_stored_locally",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "training_ai_algorithms_and_models",
+              "displayName": "training_ai_algorithms_and_models",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "cross_context_behavioral_advertising",
+              "displayName": "cross_context_behavioral_advertising",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "children_s_personal_information",
+              "displayName": "children_s_personal_information",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "source_confidence",
+              "displayName": "source_confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -160,
+        1120
+      ],
+      "id": "46d3dc58-4252-46ca-96b9-493aeab892e0",
+      "name": "Insert or update rows in a table",
+      "credentials": {
+        "postgres": {
+          "id": "yI2DPywfRK0VtKZk",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT column_name\nFROM information_schema.columns\nWHERE table_name = 'policy_scope_matrix'\nAND column_name NOT IN ('id','domain','created_at','updated_at');\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        192,
+        1184
+      ],
+      "id": "36976dc0-2051-489e-bfbb-e73caed17993",
+      "name": "Execute a SQL query1",
+      "credentials": {
+        "postgres": {
+          "id": "yI2DPywfRK0VtKZk",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "llama3.2:latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmOllama",
+      "typeVersion": 1,
+      "position": [
+        304,
+        1600
+      ],
+      "id": "042e91ad-24dd-406c-83a6-36f5fe87c2f9",
+      "name": "Ollama Model1",
+      "credentials": {
+        "ollamaApi": {
+          "id": "xHuYe0MDGOs9IpBW",
+          "name": "Local Ollama service"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a JSON generator.\n\nRULES (must follow):\n- Output ONLY valid JSON\n- Do NOT include markdown\n- Do NOT include explanations\n- Do NOT include trailing commas\n- Use null instead of empty strings\n- Evidence MUST be copied verbatim from the text\n- If no evidence exists, set value=false and evidence=null\n- NEVER invent evidence\n\nReturn EXACTLY this structure:\n\n{\n  \"scopes\": {\n    \"<scope_name>\": {\n      \"value\": true | false,\n      \"evidence\": string | null\n    }\n  }\n}\n\nScopes:\n{{ JSON.stringify($node[\"Code in JavaScript5\"].json.scopes, null, 2) }}\n\nPolicy text:\n{{ $node[\"Code in JavaScript4\"].json.text }}\n",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        272,
+        1424
+      ],
+      "id": "e0d94839-677d-4822-b1e5-b8e6dc8248e2",
+      "name": "Basic LLM Chain1",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const scopes = items.map(\n  item => item.json.column_name\n);\n\nreturn [\n  {\n    json: {\n      scopes\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        1184
+      ],
+      "id": "d01f1da6-9f97-4caf-9735-af7dcdcea75e",
+      "name": "Code in JavaScript5"
+    },
+    {
+      "parameters": {
+        "jsCode": "let raw = items[0].json.text;\n\nif (typeof raw !== \"string\") {\n  throw new Error(\"Expected LLM output to be a string\");\n}\n\n// Trim whitespace\nraw = raw.trim();\n\n// 🔥 Extract JSON object safely\nconst firstBrace = raw.indexOf(\"{\");\nconst lastBrace = raw.lastIndexOf(\"}\");\n\nif (firstBrace === -1 || lastBrace === -1) {\n  throw new Error(\"❌ No JSON object found in LLM output\");\n}\n\nconst jsonString = raw.slice(firstBrace, lastBrace + 1);\n\n// Parse\nlet parsed;\ntry {\n  parsed = JSON.parse(jsonString);\n} catch (err) {\n  throw new Error(\"❌ Invalid JSON from LLM after extraction\");\n}\n\n// Validate expected structure\nif (!parsed.scopes || typeof parsed.scopes !== \"object\") {\n  throw new Error(\"❌ JSON missing required 'scopes' object\");\n}\n\nreturn [{ json: parsed }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        736,
+        1408
+      ],
+      "id": "23f39dd8-82e9-4b37-99fc-162ccc4775b5",
+      "name": "Code in JavaScript6",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// CHANGE THIS: get domain from your earlier node\nconst domain = $node[\"Code in JavaScript4\"].json.domain;\n// or hardcode temporarily:\n// const domain = \"uber.com\";\n\nconst scopes = $node[\"Code in JavaScript6\"].json.scopes;\n\nconst rows = [];\n\nfor (const [scope, data] of Object.entries(scopes)) {\n  if (data.value === true) {\n    rows.push({\n      json: {\n        domain,\n        scope,\n        value: true,\n        evidence: data.evidence\n      }\n    });\n  }\n}\n\nreturn rows;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        1296
+      ],
+      "id": "d40a604c-18ca-46ed-a168-a5f375fd7fb1",
+      "name": "Code in JavaScript7",
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read/Write Files from Disk1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk1": {
+      "main": [
+        [
+          {
+            "node": "Extract from File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Qdrant Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Insert or update rows in a table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qdrant Vector Store": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Ollama": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Qdrant Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript4": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Basic LLM Chain1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code in JavaScript7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript5": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript6": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "0ee34863-8d33-454c-b4a1-605ea382559b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "558d88703fb65b2d0e44613bc35916258b0f0bf983c5d4730c00c424b77ca36a"
+  },
+  "id": "ljcJULJvg48GNsupumeJv",
+  "tags": []
+}
